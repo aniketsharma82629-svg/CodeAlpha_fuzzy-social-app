@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fuzzy — Profile</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div style="display:flex; align-items:center; gap:16px;">
+    <button class="nav-btn" onclick="history.back()">← Back</button>
+    <span class="navbar-logo">Fuzzy</span>
+  </div>
+  <div class="navbar-actions">
+    <button class="nav-btn" onclick="window.location.href='feed.html'">🏠 Feed</button>
+    <button class="nav-btn" onclick="logout()">Sign Out</button>
+  </div>
+</nav>
+
+<div class="profile-page">
+
+  <div id="profile-cover" class="profile-cover"></div>
+
+  <div class="profile-card" id="profile-card">
+    <div class="loader">
+      <div class="loader-spinner"></div>
+      Loading profile...
+    </div>
+  </div>
+
+  <div id="user-posts"></div>
+
+</div>
+
+<script>
+  const API = 'http://localhost:5000/api';
+  const token = localStorage.getItem('token');
+  const currentUser = JSON.parse(localStorage.getItem('user'));
+
+  if (!token) window.location.href = 'index.html';
+
+  const userId = new URLSearchParams(window.location.search).get('id');
+
+  function logout() {
+    localStorage.clear();
+    window.location.href = 'index.html';
+  }
+
+  function timeAgo(dateStr) {
+    const diff = Math.floor((new Date() - new Date(dateStr)) / 1000);
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+    return `${Math.floor(diff/86400)}d ago`;
+  }
+
+  function showToast(msg, type='success') {
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.innerHTML = `${type === 'success' ? '✓' : '⚠'} ${msg}`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+  }
+
+  async function loadProfile() {
+    try {
+      const res = await fetch(`${API}/users/${userId}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        document.getElementById('profile-card').innerHTML = '<p style="padding:20px;color:var(--text-muted);">Profile not found.</p>';
+        return;
+      }
+
+      const { user, posts, followers_count, following_count, posts_count } = data;
+      const isOwnProfile = currentUser && currentUser.id === user.id;
+      const initials = user.full_name ? user.full_name[0].toUpperCase() : user.username[0].toUpperCase();
+
+      let isFollowing = false;
+      if (!isOwnProfile && token) {
+        try {
+          const fRes = await fetch(`${API}/follow/following/${currentUser.id}`);
+          const fData = await fRes.json();
+          isFollowing = fData.following?.some(f => f.following_id === user.id);
+        } catch {}
+      }
+
+      document.getElementById('profile-card').innerHTML = `
+        <div class="profile-avatar-wrap">
+          <div class="profile-avatar-large">${initials}</div>
+          <div>
+            ${isOwnProfile
+              ? `<button class="btn btn-glass btn-sm" onclick="toggleEditForm()">✏️ Edit Profile</button>`
+              : `<button class="btn ${isFollowing ? 'btn-glass' : 'btn-primary'} btn-sm" id="follow-btn" onclick="toggleFollow('${user.id}')">
+                  ${isFollowing ? '✓ Following' : '+ Follow'}
+                </button>`
+            }
+          </div>
+        </div>
+
+        <div class="profile-info">
+          <h2>${user.full_name || user.username}</h2>
+          <p class="profile-username">@${user.username}</p>
+          <p class="profile-bio">${user.bio || 'No bio yet. Tell the world about yourself!'}</p>
+          <div class="profile-stats">
+            <div class="profile-stat">
+              <strong>${posts_count}</strong>
+              <span>Posts</span>
+            </div>
+            <div class="profile-stat">
+              <strong>${followers_count}</strong>
+              <span>Followers</span>
+            </div>
+            <div class="profile-stat">
+              <strong>${following_count}</strong>
+              <span>Following</span>
+            </div>
+          </div>
+        </div>
+
+        ${isOwnProfile ? `
+          <div id="edit-form" class="edit-form" style="display:none;">
+            <div class="form-group">
+              <label>Full Name</label>
+              <input type="text" id="edit-fullname" value="${user.full_name || ''}">
+            </div>
+            <div class="form-group">
+              <label>Bio</label>
+              <textarea id="edit-bio" rows="3">${user.bio || ''}</textarea>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-primary btn-sm" onclick="updateProfile()">Save Changes</button>
+              <button class="btn btn-glass btn-sm" onclick="toggleEditForm()">Cancel</button>
+            </div>
+          </div>
+        ` : ''}
+      `;
+
+      const postsContainer = document.getElementById('user-posts');
+      if (!posts.length) {
+        postsContainer.innerHTML = '<div class="loader" style="margin-top:16px;">No posts yet.</div>';
+      } else {
+        postsContainer.innerHTML = `
+          <div style="font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin:20px 0 12px;">
+            📝 Posts
+          </div>` +
+          posts.map(post => `
+            <div class="post-card" style="margin-bottom:12px;">
+              <div class="post-content" style="padding:20px;">${post.content}</div>
+              <div style="padding:0 20px 14px;color:var(--text-dim);font-size:12px;">${timeAgo(post.created_at)}</div>
+            </div>`).join('');
+      }
+
+    } catch (err) {
+      document.getElementById('profile-card').innerHTML =
+        '<p style="padding:20px;color:var(--text-muted);">Failed to load profile.</p>';
+    }
+  }
+
+  function toggleEditForm() {
+    const form = document.getElementById('edit-form');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  }
+
+  async function toggleFollow(targetId) {
+    const btn = document.getElementById('follow-btn');
+    const isFollowing = btn.textContent.includes('Following');
+    try {
+      const res = await fetch(`${API}/follow`, {
+        method: isFollowing ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ following_id: targetId })
+      });
+      if (res.ok) {
+        showToast(isFollowing ? 'Unfollowed.' : 'Following!');
+        loadProfile();
+      }
+    } catch {
+      showToast('Action failed.', 'error');
+    }
+  }
+
+  async function updateProfile() {
+    const full_name = document.getElementById('edit-fullname').value.trim();
+    const bio = document.getElementById('edit-bio').value.trim();
+    try {
+      const res = await fetch(`${API}/users/me`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ full_name, bio, avatar_url: '' })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem('user', JSON.stringify({ ...currentUser, full_name, bio }));
+        showToast('Profile updated!');
+        loadProfile();
+      } else {
+        showToast(data.error, 'error');
+      }
+    } catch {
+      showToast('Update failed.', 'error');
+    }
+  }
+
+  loadProfile();
+</script>
+
+</body>
+</html>

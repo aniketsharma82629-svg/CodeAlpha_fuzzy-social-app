@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fuzzy — Feed</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .image-preview-wrap {
+      position: relative;
+      margin-top: 10px;
+    }
+    .image-preview {
+      width: 100%;
+      max-height: 280px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 1px solid var(--glass-border);
+      display: block;
+    }
+    .image-remove-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.6);
+      border: none;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .post-image {
+      width: 100%;
+      max-height: 400px;
+      object-fit: cover;
+      display: block;
+      border-top: 1px solid var(--glass-border);
+      border-bottom: 1px solid var(--glass-border);
+    }
+    #image-upload-input { display: none; }
+    .char-count {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .char-count.warn { color: #fbbf24; }
+    .char-count.danger { color: #ef4444; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <span class="navbar-logo">Fuzzy</span>
+  <div class="navbar-actions">
+    <button class="nav-btn" onclick="goToProfile()">👤 Profile</button>
+    <button class="nav-btn" onclick="logout()">Sign Out</button>
+  </div>
+</nav>
+
+<div class="app-layout">
+
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar-left">
+    <nav class="sidebar-nav">
+      <button class="sidebar-nav-item active">
+        <span class="sidebar-icon">🏠</span> Home
+      </button>
+      <button class="sidebar-nav-item" onclick="goToProfile()">
+        <span class="sidebar-icon">👤</span> Profile
+      </button>
+      <button class="sidebar-nav-item" onclick="showSearchModal()">
+        <span class="sidebar-icon">🔍</span> Search
+      </button>
+      <button class="sidebar-nav-item" onclick="logout()">
+        <span class="sidebar-icon">🚪</span> Sign Out
+      </button>
+    </nav>
+  </aside>
+
+  <!-- MAIN FEED -->
+  <main class="feed-main">
+
+    <!-- CREATE POST -->
+    <div class="create-post-card">
+      <div class="create-post-top">
+        <div class="avatar" id="create-avatar">U</div>
+        <div style="flex:1;">
+          <textarea id="post-content" rows="3" placeholder="What's on your mind?" oninput="updateCharCount(this)"></textarea>
+          <div id="image-preview-container"></div>
+          <input type="file" id="image-upload-input" accept="image/*" onchange="handleImageSelect(this)">
+        </div>
+      </div>
+      <div class="create-post-actions">
+        <div class="create-post-tools">
+          <button class="tool-btn" title="Add photo" onclick="document.getElementById('image-upload-input').click()">🖼️</button>
+          <button class="tool-btn" title="Add feeling" onclick="insertEmoji()">😊</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span class="char-count" id="char-count">0 / 500</span>
+          <button class="btn btn-primary btn-sm" onclick="createPost()">Post →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- POSTS -->
+    <div id="posts-container">
+      <div class="loader">
+        <div class="loader-spinner"></div>
+        Loading your feed...
+      </div>
+    </div>
+
+  </main>
+
+  <!-- RIGHT SIDEBAR -->
+  <aside class="sidebar-right">
+    <div class="widget-card">
+      <div class="widget-title">🔥 Trending</div>
+      <div class="trending-item"><div class="trending-tag">#WebDev</div><div class="trending-count">2.4k posts</div></div>
+      <div class="trending-item"><div class="trending-tag">#Design</div><div class="trending-count">1.8k posts</div></div>
+      <div class="trending-item"><div class="trending-tag">#JavaScript</div><div class="trending-count">3.1k posts</div></div>
+      <div class="trending-item"><div class="trending-tag">#OpenSource</div><div class="trending-count">987 posts</div></div>
+    </div>
+    <div class="widget-card">
+      <div class="widget-title">👥 Who to Follow</div>
+      <div id="suggested-users"><div class="loader" style="padding:16px;">Loading...</div></div>
+    </div>
+  </aside>
+
+</div>
+
+<!-- SEARCH MODAL -->
+<div id="search-modal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Search People</span>
+      <button class="modal-close" onclick="closeSearchModal()">✕</button>
+    </div>
+    <div class="form-group">
+      <input type="text" id="search-input" placeholder="Search by username..." oninput="searchUsers(this.value)"
+        style="width:100%;padding:12px 16px;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:10px;color:var(--text);font-family:Inter,sans-serif;font-size:14px;outline:none;">
+    </div>
+    <div id="search-results" style="max-height:300px;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:5000/api';
+  const token = localStorage.getItem('token');
+  const currentUser = JSON.parse(localStorage.getItem('user'));
+
+  if (!token) window.location.href = 'index.html';
+
+  document.getElementById('create-avatar').textContent =
+    currentUser?.full_name ? currentUser.full_name[0].toUpperCase() : currentUser?.username?.[0]?.toUpperCase() || 'U';
+
+  let selectedImageBase64 = null;
+
+  function logout() { localStorage.clear(); window.location.href = 'index.html'; }
+  function goToProfile() { window.location.href = `profile.html?id=${currentUser.id}`; }
+
+  function timeAgo(dateStr) {
+    const diff = Math.floor((new Date() - new Date(dateStr)) / 1000);
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+    return `${Math.floor(diff/86400)}d ago`;
+  }
+
+  function showToast(msg, type='success') {
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.innerHTML = `${type === 'success' ? '✓' : '⚠'} ${msg}`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+  }
+
+  function updateCharCount(textarea) {
+    const len = textarea.value.length;
+    const el = document.getElementById('char-count');
+    el.textContent = `${len} / 500`;
+    el.className = 'char-count' + (len > 450 ? ' warn' : '') + (len > 490 ? ' danger' : '');
+  }
+
+  function insertEmoji() {
+    const emojis = ['😊','🔥','💡','🎉','❤️','👏','🚀','✨','😂','🙌'];
+    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+    const ta = document.getElementById('post-content');
+    ta.value += emoji;
+    updateCharCount(ta);
+  }
+
+  function handleImageSelect(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image must be under 5MB.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      selectedImageBase64 = e.target.result;
+      document.getElementById('image-preview-container').innerHTML = `
+        <div class="image-preview-wrap">
+          <img src="${selectedImageBase64}" class="image-preview" alt="Preview">
+          <button class="image-remove-btn" onclick="removeImage()">✕</button>
+        </div>`;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeImage() {
+    selectedImageBase64 = null;
+    document.getElementById('image-preview-container').innerHTML = '';
+    document.getElementById('image-upload-input').value = '';
+  }
+
+  async function loadPosts() {
+    try {
+      const res = await fetch(`${API}/posts`);
+      const data = await res.json();
+      const container = document.getElementById('posts-container');
+
+      if (!data.posts?.length) {
+        container.innerHTML = '<div class="loader">No posts yet. Be the first to share! ✨</div>';
+        return;
+      }
+
+      container.innerHTML = data.posts.map(post => {
+        const initials = post.users.full_name
+          ? post.users.full_name[0].toUpperCase()
+          : post.users.username[0].toUpperCase();
+        const isOwn = post.user_id === currentUser.id;
+        return `
+          <div class="post-card" id="post-${post.id}">
+            <div class="post-header">
+              <div class="avatar" onclick="viewProfile('${post.users.id}')">${initials}</div>
+              <div class="post-user-info">
+                <strong onclick="viewProfile('${post.users.id}')">${post.users.full_name || post.users.username}</strong>
+                <span>@${post.users.username} · ${timeAgo(post.created_at)}</span>
+              </div>
+              ${isOwn ? `<button class="post-menu-btn" onclick="deletePost('${post.id}')" title="Delete">🗑</button>` : ''}
+            </div>
+            ${post.content ? `<div class="post-content">${post.content}</div>` : ''}
+            ${post.image_url ? `<img src="${post.image_url}" class="post-image" alt="Post image" onerror="this.style.display='none'">` : ''}
+            <div class="post-actions">
+              <button class="action-btn" id="like-btn-${post.id}" onclick="toggleLike('${post.id}')">🤍 0</button>
+              <button class="action-btn" onclick="toggleComments('${post.id}')">💬 Comment</button>
+              <button class="action-btn" onclick="sharePost('${post.id}')">🔗 Share</button>
+            </div>
+            <div id="comments-${post.id}" style="display:none;">
+              <div class="comments-section">
+                <div id="comments-list-${post.id}"></div>
+                <div class="comment-input-row">
+                  <div class="avatar avatar-sm">${initials}</div>
+                  <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." onkeydown="if(event.key==='Enter') addComment('${post.id}')">
+                  <button class="comment-send-btn" onclick="addComment('${post.id}')">➤</button>
+                </div>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      loadLikeStates(data.posts);
+
+    } catch {
+      document.getElementById('posts-container').innerHTML =
+        '<div class="loader">Failed to load posts. Check your connection.</div>';
+    }
+  }
+
+  async function loadLikeStates(posts) {
+    for (const post of posts) {
+      try {
+        const res = await fetch(`${API}/likes/${post.id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        const btn = document.getElementById(`like-btn-${post.id}`);
+        if (!btn) continue;
+        btn.innerHTML = `${data.liked ? '❤️' : '🤍'} ${data.likes_count || 0}`;
+        if (data.liked) btn.classList.add('liked'); else btn.classList.remove('liked');
+      } catch {}
+    }
+  }
+
+  async function createPost() {
+    const content = document.getElementById('post-content').value.trim();
+    if (!content && !selectedImageBase64) return showToast('Write something or add a photo!', 'error');
+    if (content.length > 500) return showToast('Post is too long! Max 500 characters.', 'error');
+
+    try {
+      const res = await fetch(`${API}/posts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ content, image_url: selectedImageBase64 || '' })
+      });
+      const data = await res.json();
+      if (!res.ok) return showToast(data.error, 'error');
+      document.getElementById('post-content').value = '';
+      removeImage();
+      updateCharCount(document.getElementById('post-content'));
+      showToast('Post shared! 🎉');
+      loadPosts();
+    } catch {
+      showToast('Failed to create post.', 'error');
+    }
+  }
+
+  async function deletePost(postId) {
+    if (!confirm('Delete this post?')) return;
+    try {
+      const res = await fetch(`${API}/posts/${postId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) { document.getElementById(`post-${postId}`)?.remove(); showToast('Post deleted.'); }
+    } catch { showToast('Failed to delete.', 'error'); }
+  }
+
+  async function toggleLike(postId) {
+    const btn = document.getElementById(`like-btn-${postId}`);
+    const isLiked = btn.classList.contains('liked');
+    try {
+      await fetch(`${API}/likes`, {
+        method: isLiked ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ post_id: postId })
+      });
+      const res = await fetch(`${API}/likes/${postId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await res.json();
+      btn.innerHTML = `${data.liked ? '❤️' : '🤍'} ${data.likes_count || 0}`;
+      if (data.liked) btn.classList.add('liked'); else btn.classList.remove('liked');
+    } catch { showToast('Action failed.', 'error'); }
+  }
+
+  async function toggleComments(postId) {
+    const section = document.getElementById(`comments-${postId}`);
+    if (section.style.display === 'none') {
+      section.style.display = 'block';
+      loadComments(postId);
+    } else {
+      section.style.display = 'none';
+    }
+  }
+
+  async function loadComments(postId) {
+    try {
+      const res = await fetch(`${API}/comments/${postId}`);
+      const data = await res.json();
+      const list = document.getElementById(`comments-list-${postId}`);
+      if (!data.comments?.length) {
+        list.innerHTML = '<p style="color:var(--text-dim);font-size:13px;padding:4px 0 12px;">No comments yet. Start the conversation!</p>';
+        return;
+      }
+      list.innerHTML = data.comments.map(c => `
+        <div class="comment-item">
+          <div class="avatar avatar-sm">
+            ${c.users.full_name ? c.users.full_name[0].toUpperCase() : c.users.username[0].toUpperCase()}
+          </div>
+          <div class="comment-body">
+            <strong>@${c.users.username}</strong>${c.content}
+          </div>
+        </div>`).join('');
+    } catch {}
+  }
+
+  async function addComment(postId) {
+    const input = document.getElementById(`comment-input-${postId}`);
+    const content = input.value.trim();
+    if (!content) return;
+    try {
+      const res = await fetch(`${API}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ post_id: postId, content })
+      });
+      if (res.ok) { input.value = ''; loadComments(postId); }
+    } catch { showToast('Failed to comment.', 'error'); }
+  }
+
+  function sharePost(postId) {
+    navigator.clipboard.writeText(`${window.location.origin}/feed.html#post-${postId}`)
+      .then(() => showToast('Link copied! 🔗'));
+  }
+
+  function viewProfile(userId) { window.location.href = `profile.html?id=${userId}`; }
+
+  function showSearchModal() {
+    document.getElementById('search-modal').style.display = 'flex';
+    setTimeout(() => document.getElementById('search-input').focus(), 100);
+  }
+
+  function closeSearchModal() {
+    document.getElementById('search-modal').style.display = 'none';
+    document.getElementById('search-results').innerHTML = '';
+    document.getElementById('search-input').value = '';
+  }
+
+  let searchTimeout;
+  async function searchUsers(query) {
+    clearTimeout(searchTimeout);
+    if (!query.trim()) { document.getElementById('search-results').innerHTML = ''; return; }
+    searchTimeout = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API}/users/search/${query}`);
+        const data = await res.json();
+        const container = document.getElementById('search-results');
+        if (!data.users?.length) {
+          container.innerHTML = '<p style="color:var(--text-dim);font-size:13px;padding:12px 0;">No users found.</p>';
+          return;
+        }
+        container.innerHTML = data.users.map(u => `
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--glass-border);cursor:pointer;"
+            onclick="viewProfile('${u.id}'); closeSearchModal();">
+            <div class="avatar avatar-sm">${u.full_name ? u.full_name[0].toUpperCase() : u.username[0].toUpperCase()}</div>
+            <div>
+              <strong style="display:block;font-size:13px;color:var(--text);">${u.full_name || u.username}</strong>
+              <span style="font-size:12px;color:var(--text-dim);">@${u.username}</span>
+            </div>
+          </div>`).join('');
+      } catch {}
+    }, 300);
+  }
+
+  async function loadSuggestedUsers() {
+    try {
+      const res = await fetch(`${API}/users/search/a`);
+      const data = await res.json();
+      const users = (data.users || []).filter(u => u.id !== currentUser.id).slice(0, 4);
+      const container = document.getElementById('suggested-users');
+      if (!users.length) { container.innerHTML = '<p style="color:var(--text-dim);font-size:13px;">No suggestions yet.</p>'; return; }
+      container.innerHTML = users.map(u => `
+        <div class="suggested-user">
+          <div class="avatar avatar-sm" onclick="viewProfile('${u.id}')" style="cursor:pointer;">
+            ${u.full_name ? u.full_name[0].toUpperCase() : u.username[0].toUpperCase()}
+          </div>
+          <div class="suggested-user-info">
+            <strong>${u.full_name || u.username}</strong>
+            <span>@${u.username}</span>
+          </div>
+          <button class="follow-btn-sm" onclick="quickFollow('${u.id}', this)">Follow</button>
+        </div>`).join('');
+    } catch {}
+  }
+
+  async function quickFollow(userId, btn) {
+    try {
+      const res = await fetch(`${API}/follow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ following_id: userId })
+      });
+      if (res.ok) { btn.textContent = 'Following ✓'; btn.style.opacity = '0.6'; btn.disabled = true; showToast('Following!'); }
+    } catch {}
+  }
+
+  document.getElementById('search-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeSearchModal();
+  });
+
+  loadPosts();
+  loadSuggestedUsers();
+</script>
+
+</body>
+</html>
