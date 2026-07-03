@@ -21,7 +21,7 @@ app.use('/api/follow', require('./routes/follow'));
 app.use('/api/users', require('./routes/users'));
 
 // Test route
-app.get('/', (req, res) => {
+ app.get('/', (req, res) => {
   res.json({ message: 'Social App API chal rahi hai! 🚀' });
 });
 
