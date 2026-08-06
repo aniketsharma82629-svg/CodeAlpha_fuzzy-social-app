@@ -5,57 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fuzzy — Feed</title>
   <link rel="stylesheet" href="style.css">
-  <style>
-    .image-preview-wrap {
-      position: relative;
-      margin-top: 10px;
-    }
-    .image-preview {
-      width: 100%;
-      max-height: 280px;
-      object-fit: cover;
-      border-radius: 12px;
-      border: 1px solid var(--glass-border);
-      display: block;
-    }
-    .image-remove-btn {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: rgba(0,0,0,0.6);
-      border: none;
-      color: #fff;
-      font-size: 14px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .post-image {
-      width: 100%;
-      max-height: 400px;
-      object-fit: cover;
-      display: block;
-      border-top: 1px solid var(--glass-border);
-      border-bottom: 1px solid var(--glass-border);
-    }
-    #image-upload-input { display: none; }
-    .char-count {
-      font-size: 12px;
-      color: var(--text-dim);
-    }
-    .char-count.warn { color: #fbbf24; }
-    .char-count.danger { color: #ef4444; }
-  </style>
 </head>
 <body>
 
 <nav class="navbar">
   <span class="navbar-logo">Fuzzy</span>
   <div class="navbar-actions">
+    <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle theme">🌙</button>
+    <button class="nav-btn" onclick="showSearchModal()">🔍 Search</button>
     <button class="nav-btn" onclick="goToProfile()">👤 Profile</button>
     <button class="nav-btn" onclick="logout()">Sign Out</button>
   </div>
@@ -65,6 +22,13 @@
 
   <!-- LEFT SIDEBAR -->
   <aside class="sidebar-left">
+    <div class="sidebar-profile" onclick="goToProfile()">
+      <div class="avatar avatar-sm" id="sidebar-avatar">U</div>
+      <div class="sidebar-profile-info">
+        <strong id="sidebar-name">Loading...</strong>
+        <span id="sidebar-username">@username</span>
+      </div>
+    </div>
     <nav class="sidebar-nav">
       <button class="sidebar-nav-item active">
         <span class="sidebar-icon">🏠</span> Home
@@ -75,7 +39,11 @@
       <button class="sidebar-nav-item" onclick="showSearchModal()">
         <span class="sidebar-icon">🔍</span> Search
       </button>
-      <button class="sidebar-nav-item" onclick="logout()">
+      <button class="sidebar-nav-item" onclick="toggleTheme()">
+        <span class="sidebar-icon" id="theme-icon-sidebar">🌙</span>
+        <span id="theme-label">Dark Mode</span>
+      </button>
+      <button class="sidebar-nav-item" onclick="logout()" style="color:#ef4444; margin-top:8px;">
         <span class="sidebar-icon">🚪</span> Sign Out
       </button>
     </nav>
@@ -83,6 +51,18 @@
 
   <!-- MAIN FEED -->
   <main class="feed-main">
+
+    <!-- STORIES BAR -->
+    <div class="stories-bar">
+      <div class="stories-list" id="stories-list">
+        <div class="story-item" onclick="goToProfile()">
+          <div class="story-avatar-wrap">
+            <div class="story-avatar story-add" id="your-story-avatar">+</div>
+          </div>
+          <span class="story-name">Your story</span>
+        </div>
+      </div>
+    </div>
 
     <!-- CREATE POST -->
     <div class="create-post-card">
@@ -97,66 +77,145 @@
       <div class="create-post-actions">
         <div class="create-post-tools">
           <button class="tool-btn" title="Add photo" onclick="document.getElementById('image-upload-input').click()">🖼️</button>
-          <button class="tool-btn" title="Add feeling" onclick="insertEmoji()">😊</button>
+          <button class="tool-btn" title="Add emoji" onclick="insertEmoji()">😊</button>
+          <button class="tool-btn" title="Add GIF">🎬</button>
         </div>
         <div style="display:flex; align-items:center; gap:12px;">
           <span class="char-count" id="char-count">0 / 500</span>
-          <button class="btn btn-primary btn-sm" onclick="createPost()">Post →</button>
+          <button class="btn btn-primary btn-sm" onclick="createPost()" id="post-btn">Post</button>
         </div>
       </div>
     </div>
 
-    <!-- POSTS -->
-    <div id="posts-container">
-      <div class="loader">
-        <div class="loader-spinner"></div>
-        Loading your feed...
+    <!-- SKELETON LOADER -->
+    <div id="skeleton-loader">
+      <div class="skeleton-card">
+        <div style="display:flex; gap:12px; margin-bottom:16px;">
+          <div class="skeleton" style="width:42px; height:42px; border-radius:50%; flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div class="skeleton skeleton-line" style="width:40%;"></div>
+            <div class="skeleton skeleton-line" style="width:25%; margin-top:6px;"></div>
+          </div>
+        </div>
+        <div class="skeleton skeleton-line" style="width:100%;"></div>
+        <div class="skeleton skeleton-line" style="width:80%;"></div>
+        <div class="skeleton skeleton-line" style="width:60%;"></div>
+      </div>
+      <div class="skeleton-card">
+        <div style="display:flex; gap:12px; margin-bottom:16px;">
+          <div class="skeleton" style="width:42px; height:42px; border-radius:50%; flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div class="skeleton skeleton-line" style="width:35%;"></div>
+            <div class="skeleton skeleton-line" style="width:20%; margin-top:6px;"></div>
+          </div>
+        </div>
+        <div class="skeleton skeleton-line" style="width:100%;"></div>
+        <div class="skeleton skeleton-line" style="width:70%;"></div>
       </div>
     </div>
+
+    <!-- POSTS -->
+    <div id="posts-container" style="display:none;"></div>
 
   </main>
 
   <!-- RIGHT SIDEBAR -->
   <aside class="sidebar-right">
     <div class="widget-card">
-      <div class="widget-title">🔥 Trending</div>
+      <div class="widget-title">🔥 Trending today</div>
       <div class="trending-item"><div class="trending-tag">#WebDev</div><div class="trending-count">2.4k posts</div></div>
       <div class="trending-item"><div class="trending-tag">#Design</div><div class="trending-count">1.8k posts</div></div>
       <div class="trending-item"><div class="trending-tag">#JavaScript</div><div class="trending-count">3.1k posts</div></div>
       <div class="trending-item"><div class="trending-tag">#OpenSource</div><div class="trending-count">987 posts</div></div>
+      <div class="trending-item"><div class="trending-tag">#AI</div><div class="trending-count">5.2k posts</div></div>
     </div>
     <div class="widget-card">
-      <div class="widget-title">👥 Who to Follow</div>
-      <div id="suggested-users"><div class="loader" style="padding:16px;">Loading...</div></div>
+      <div class="widget-title">👥 Who to follow</div>
+      <div id="suggested-users"><div class="loader" style="padding:8px; text-align:left; color:var(--text-dim); font-size:13px;">Loading...</div></div>
+    </div>
+    <div class="widget-card" style="font-size:12px; color:var(--text-dim); line-height:1.8;">
+      <a href="#" style="color:var(--text-dim); text-decoration:none; margin-right:12px;">About</a>
+      <a href="#" style="color:var(--text-dim); text-decoration:none; margin-right:12px;">Privacy</a>
+      <a href="#" style="color:var(--text-dim); text-decoration:none;">Terms</a>
+      <div style="margin-top:8px;">© 2026 Fuzzy</div>
     </div>
   </aside>
 
+</div>
+
+<!-- MOBILE BOTTOM NAV -->
+<div class="mobile-nav">
+  <button class="mobile-nav-item active">
+    <span class="mobile-nav-icon">🏠</span>
+    Home
+  </button>
+  <button class="mobile-nav-item" onclick="showSearchModal()">
+    <span class="mobile-nav-icon">🔍</span>
+    Search
+  </button>
+  <button class="mobile-nav-item" onclick="goToProfile()">
+    <span class="mobile-nav-icon">👤</span>
+    Profile
+  </button>
+  <button class="mobile-nav-item" onclick="toggleTheme()">
+    <span class="mobile-nav-icon">🌙</span>
+    Theme
+  </button>
 </div>
 
 <!-- SEARCH MODAL -->
 <div id="search-modal" class="modal-overlay" style="display:none;">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">Search People</span>
+      <span class="modal-title">Search people</span>
       <button class="modal-close" onclick="closeSearchModal()">✕</button>
     </div>
-    <div class="form-group">
-      <input type="text" id="search-input" placeholder="Search by username..." oninput="searchUsers(this.value)"
-        style="width:100%;padding:12px 16px;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:10px;color:var(--text);font-family:Inter,sans-serif;font-size:14px;outline:none;">
-    </div>
-    <div id="search-results" style="max-height:300px;overflow-y:auto;"></div>
+    <input type="text" class="search-input" id="search-input" placeholder="Search by username..." oninput="searchUsers(this.value)">
+    <div id="search-results" style="margin-top:16px; max-height:320px; overflow-y:auto;"></div>
   </div>
 </div>
 
 <script>
-const API = 'https://fuzzy-social-app-production.up.railway.app/api';
+  const API = 'http://localhost:5000/api';
   const token = localStorage.getItem('token');
   const currentUser = JSON.parse(localStorage.getItem('user'));
 
   if (!token) window.location.href = 'index.html';
 
-  document.getElementById('create-avatar').textContent =
-    currentUser?.full_name ? currentUser.full_name[0].toUpperCase() : currentUser?.username?.[0]?.toUpperCase() || 'U';
+  // Theme
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  updateThemeUI(savedTheme);
+
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    updateThemeUI(next);
+  }
+
+  function updateThemeUI(theme) {
+    const isDark = theme === 'dark';
+    const btn = document.getElementById('theme-btn');
+    const icon = document.getElementById('theme-icon-sidebar');
+    const label = document.getElementById('theme-label');
+    if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+    if (icon) icon.textContent = isDark ? '☀️' : '🌙';
+    if (label) label.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+  }
+
+  // Init user UI
+  if (currentUser) {
+    const initials = currentUser.full_name ? currentUser.full_name[0].toUpperCase() : currentUser.username[0].toUpperCase();
+    document.getElementById('create-avatar').textContent = initials;
+    document.getElementById('sidebar-avatar').textContent = initials;
+    document.getElementById('sidebar-name').textContent = currentUser.full_name || currentUser.username;
+    document.getElementById('sidebar-username').textContent = '@' + currentUser.username;
+    document.getElementById('your-story-avatar').textContent = initials;
+    document.getElementById('your-story-avatar').style.background = 'linear-gradient(135deg, #6366f1, #ec4899)';
+    document.getElementById('your-story-avatar').style.color = '#fff';
+  }
 
   let selectedImageBase64 = null;
 
@@ -165,42 +224,39 @@ const API = 'https://fuzzy-social-app-production.up.railway.app/api';
 
   function timeAgo(dateStr) {
     const diff = Math.floor((new Date() - new Date(dateStr)) / 1000);
-    if (diff < 60) return `${diff}s ago`;
-    if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
-    return `${Math.floor(diff/86400)}d ago`;
+    if (diff < 60) return `${diff}s`;
+    if (diff < 3600) return `${Math.floor(diff/60)}m`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h`;
+    return `${Math.floor(diff/86400)}d`;
   }
 
   function showToast(msg, type='success') {
     const t = document.createElement('div');
     t.className = `toast ${type}`;
-    t.innerHTML = `${type === 'success' ? '✓' : '⚠'} ${msg}`;
+    t.innerHTML = `${type === 'success' ? '✅' : '⚠️'} ${msg}`;
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 3000);
   }
 
-  function updateCharCount(textarea) {
-    const len = textarea.value.length;
+  function updateCharCount(ta) {
+    const len = ta.value.length;
     const el = document.getElementById('char-count');
     el.textContent = `${len} / 500`;
     el.className = 'char-count' + (len > 450 ? ' warn' : '') + (len > 490 ? ' danger' : '');
   }
 
   function insertEmoji() {
-    const emojis = ['😊','🔥','💡','🎉','❤️','👏','🚀','✨','😂','🙌'];
-    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+    const emojis = ['😊','🔥','💡','🎉','❤️','👏','🚀','✨','😂','🙌','💪','🤔'];
     const ta = document.getElementById('post-content');
-    ta.value += emoji;
+    ta.value += emojis[Math.floor(Math.random() * emojis.length)];
     updateCharCount(ta);
+    ta.focus();
   }
 
   function handleImageSelect(input) {
     const file = input.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Image must be under 5MB.', 'error');
-      return;
-    }
+    if (file.size > 5 * 1024 * 1024) { showToast('Image must be under 5MB.', 'error'); return; }
     const reader = new FileReader();
     reader.onload = (e) => {
       selectedImageBase64 = e.target.result;
@@ -223,32 +279,41 @@ const API = 'https://fuzzy-social-app-production.up.railway.app/api';
     try {
       const res = await fetch(`${API}/posts`);
       const data = await res.json();
+
+      document.getElementById('skeleton-loader').style.display = 'none';
       const container = document.getElementById('posts-container');
+      container.style.display = 'block';
 
       if (!data.posts?.length) {
-        container.innerHTML = '<div class="loader">No posts yet. Be the first to share! ✨</div>';
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📝</div>
+            <h3>No posts yet</h3>
+            <p>Be the first one to share something with the world!</p>
+          </div>`;
         return;
       }
 
-      container.innerHTML = data.posts.map(post => {
-        const initials = post.users.full_name
-          ? post.users.full_name[0].toUpperCase()
-          : post.users.username[0].toUpperCase();
+      container.innerHTML = data.posts.map((post, i) => {
+        const initials = post.users.full_name ? post.users.full_name[0].toUpperCase() : post.users.username[0].toUpperCase();
         const isOwn = post.user_id === currentUser.id;
         return `
-          <div class="post-card" id="post-${post.id}">
+          <div class="post-card fade-in" id="post-${post.id}" style="animation-delay:${i * 0.05}s">
             <div class="post-header">
               <div class="avatar" onclick="viewProfile('${post.users.id}')">${initials}</div>
               <div class="post-user-info">
                 <strong onclick="viewProfile('${post.users.id}')">${post.users.full_name || post.users.username}</strong>
-                <span>@${post.users.username} · ${timeAgo(post.created_at)}</span>
+                <span>@${post.users.username} · ${timeAgo(post.created_at)} ago</span>
               </div>
-              ${isOwn ? `<button class="post-menu-btn" onclick="deletePost('${post.id}')" title="Delete">🗑</button>` : ''}
+              ${isOwn ? `<button class="post-menu-btn" onclick="deletePost('${post.id}')" title="Delete post">🗑</button>` : ''}
             </div>
             ${post.content ? `<div class="post-content">${post.content}</div>` : ''}
-            ${post.image_url ? `<img src="${post.image_url}" class="post-image" alt="Post image" onerror="this.style.display='none'">` : ''}
+            ${post.image_url ? `<img src="${post.image_url}" class="post-image" alt="Post" loading="lazy" onerror="this.style.display='none'">` : ''}
+            <div class="post-stats" id="stats-${post.id}">
+              <span id="like-count-${post.id}">0 likes</span>
+            </div>
             <div class="post-actions">
-              <button class="action-btn" id="like-btn-${post.id}" onclick="toggleLike('${post.id}')">🤍 0</button>
+              <button class="action-btn" id="like-btn-${post.id}" onclick="toggleLike('${post.id}')">🤍 Like</button>
               <button class="action-btn" onclick="toggleComments('${post.id}')">💬 Comment</button>
               <button class="action-btn" onclick="sharePost('${post.id}')">🔗 Share</button>
             </div>
@@ -266,24 +331,49 @@ const API = 'https://fuzzy-social-app-production.up.railway.app/api';
       }).join('');
 
       loadLikeStates(data.posts);
+      loadStories(data.posts);
 
     } catch {
+      document.getElementById('skeleton-loader').style.display = 'none';
+      document.getElementById('posts-container').style.display = 'block';
       document.getElementById('posts-container').innerHTML =
         '<div class="loader">Failed to load posts. Check your connection.</div>';
     }
   }
 
+  function loadStories(posts) {
+    const seen = new Set();
+    const users = posts.filter(p => {
+      if (seen.has(p.users.id) || p.users.id === currentUser.id) return false;
+      seen.add(p.users.id);
+      return true;
+    }).slice(0, 6);
+
+    const list = document.getElementById('stories-list');
+    const existing = list.innerHTML;
+    list.innerHTML = existing + users.map(p => `
+      <div class="story-item" onclick="viewProfile('${p.users.id}')">
+        <div class="story-avatar-wrap">
+          <div class="story-avatar">
+            ${p.users.full_name ? p.users.full_name[0].toUpperCase() : p.users.username[0].toUpperCase()}
+          </div>
+        </div>
+        <span class="story-name">${p.users.username}</span>
+      </div>`).join('');
+  }
+
   async function loadLikeStates(posts) {
     for (const post of posts) {
       try {
-        const res = await fetch(`${API}/likes/${post.id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch(`${API}/likes/${post.id}`, { headers: { 'Authorization': `Bearer ${token}` } });
         const data = await res.json();
         const btn = document.getElementById(`like-btn-${post.id}`);
-        if (!btn) continue;
-        btn.innerHTML = `${data.liked ? '❤️' : '🤍'} ${data.likes_count || 0}`;
-        if (data.liked) btn.classList.add('liked'); else btn.classList.remove('liked');
+        const count = document.getElementById(`like-count-${post.id}`);
+        if (btn) {
+          btn.innerHTML = `${data.liked ? '❤️' : '🤍'} Like`;
+          if (data.liked) btn.classList.add('liked'); else btn.classList.remove('liked');
+        }
+        if (count) count.textContent = `${data.likes_count || 0} ${data.likes_count === 1 ? 'like' : 'likes'}`;
       } catch {}
     }
   }
@@ -293,6 +383,10 @@ const API = 'https://fuzzy-social-app-production.up.railway.app/api';
     if (!content && !selectedImageBase64) return showToast('Write something or add a photo!', 'error');
     if (content.length > 500) return showToast('Post is too long! Max 500 characters.', 'error');
 
+    const btn = document.getElementById('post-btn');
+    btn.disabled = true;
+    btn.textContent = 'Posting...';
+
     try {
       const res = await fetch(`${API}/posts`, {
         method: 'POST',
@@ -300,7 +394,7 @@ const API = 'https://fuzzy-social-app-production.up.railway.app/api';
         body: JSON.stringify({ content, image_url: selectedImageBase64 || '' })
       });
       const data = await res.json();
-      if (!res.ok) return showToast(data.error, 'error');
+      if (!res.ok) { showToast(data.error, 'error'); return; }
       document.getElementById('post-content').value = '';
       removeImage();
       updateCharCount(document.getElementById('post-content'));
@@ -308,6 +402,9 @@ const API = 'https://fuzzy-social-app-production.up.railway.app/api';
       loadPosts();
     } catch {
       showToast('Failed to create post.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Post';
     }
   }
 
@@ -318,7 +415,14 @@ const API = 'https://fuzzy-social-app-production.up.railway.app/api';
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) { document.getElementById(`post-${postId}`)?.remove(); showToast('Post deleted.'); }
+      if (res.ok) {
+        const el = document.getElementById(`post-${postId}`);
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(-10px)';
+        el.style.transition = 'all 0.3s ease';
+        setTimeout(() => el.remove(), 300);
+        showToast('Post deleted.');
+      }
     } catch { showToast('Failed to delete.', 'error'); }
   }
 
@@ -333,8 +437,10 @@ const API = 'https://fuzzy-social-app-production.up.railway.app/api';
       });
       const res = await fetch(`${API}/likes/${postId}`, { headers: { 'Authorization': `Bearer ${token}` } });
       const data = await res.json();
-      btn.innerHTML = `${data.liked ? '❤️' : '🤍'} ${data.likes_count || 0}`;
+      btn.innerHTML = `${data.liked ? '❤️' : '🤍'} Like`;
       if (data.liked) btn.classList.add('liked'); else btn.classList.remove('liked');
+      const count = document.getElementById(`like-count-${postId}`);
+      if (count) count.textContent = `${data.likes_count || 0} ${data.likes_count === 1 ? 'like' : 'likes'}`;
     } catch { showToast('Action failed.', 'error'); }
   }
 
@@ -411,15 +517,15 @@ const API = 'https://fuzzy-social-app-production.up.railway.app/api';
         const data = await res.json();
         const container = document.getElementById('search-results');
         if (!data.users?.length) {
-          container.innerHTML = '<p style="color:var(--text-dim);font-size:13px;padding:12px 0;">No users found.</p>';
+          container.innerHTML = '<p style="color:var(--text-dim);font-size:13px;">No users found.</p>';
           return;
         }
         container.innerHTML = data.users.map(u => `
-          <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--glass-border);cursor:pointer;"
+          <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;"
             onclick="viewProfile('${u.id}'); closeSearchModal();">
             <div class="avatar avatar-sm">${u.full_name ? u.full_name[0].toUpperCase() : u.username[0].toUpperCase()}</div>
             <div>
-              <strong style="display:block;font-size:13px;color:var(--text);">${u.full_name || u.username}</strong>
+              <strong style="display:block;font-size:14px;color:var(--text);">${u.full_name || u.username}</strong>
               <span style="font-size:12px;color:var(--text-dim);">@${u.username}</span>
             </div>
           </div>`).join('');
@@ -433,7 +539,10 @@ const API = 'https://fuzzy-social-app-production.up.railway.app/api';
       const data = await res.json();
       const users = (data.users || []).filter(u => u.id !== currentUser.id).slice(0, 4);
       const container = document.getElementById('suggested-users');
-      if (!users.length) { container.innerHTML = '<p style="color:var(--text-dim);font-size:13px;">No suggestions yet.</p>'; return; }
+      if (!users.length) {
+        container.innerHTML = '<p style="color:var(--text-dim);font-size:13px;">No suggestions yet.</p>';
+        return;
+      }
       container.innerHTML = users.map(u => `
         <div class="suggested-user">
           <div class="avatar avatar-sm" onclick="viewProfile('${u.id}')" style="cursor:pointer;">
@@ -455,7 +564,12 @@ const API = 'https://fuzzy-social-app-production.up.railway.app/api';
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ following_id: userId })
       });
-      if (res.ok) { btn.textContent = 'Following ✓'; btn.style.opacity = '0.6'; btn.disabled = true; showToast('Following!'); }
+      if (res.ok) {
+        btn.textContent = 'Following ✓';
+        btn.style.opacity = '0.5';
+        btn.disabled = true;
+        showToast('Following!');
+      }
     } catch {}
   }
 
